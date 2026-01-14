@@ -1,0 +1,10 @@
+{
+    "engine_prob": 0.9999725222587585,
+    "bearing_prob": 0.49254369735717773,
+    "stress_index": 0.22298675957215253,
+    "final_risk": 0.9747216609464755,
+    "vehicle_status": "Critical",
+    "dtc_codes": [
+        "P0217 - Engine Overheat Risk"
+    ]
+}
