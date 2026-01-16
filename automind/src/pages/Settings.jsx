@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Sidebar from "../components/dashboard/Sidebar";
 import {
   User,
@@ -29,19 +29,15 @@ import {
 } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 
-/* ---------------- MOCK USER (REPLACE WITH API LATER) ---------------- */
-
-const mockUser = {
-  fullName: "John Doe",
-  email: "john@example.com",
-  phone: "+91 98765 43210",
-  role: "service", // customer | oem | service
-};
+import { auth } from "@/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function Settings() {
   const navigate = useNavigate();
 
-  const [user, setUser] = useState(mockUser);
+  /* ---------------- AUTH USER ---------------- */
+
+  const [user, setUser] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const [notifications, setNotifications] = useState({
@@ -50,6 +46,35 @@ export default function Settings() {
     push: true,
     voice: false,
   });
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        navigate("/login");
+        return;
+      }
+
+      setUser({
+        uid: firebaseUser.uid,
+        fullName: firebaseUser.displayName || "User",
+        email: firebaseUser.email || "",
+        phone: firebaseUser.phoneNumber || "",
+        role: "service", // 🔁 later load from Firestore
+      });
+    });
+
+    return () => unsub();
+  }, [navigate]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading user settings…
+      </div>
+    );
+  }
+
+  /* ---------------- SAVE (MOCK) ---------------- */
 
   const handleSave = () => {
     setSaving(true);
@@ -64,7 +89,7 @@ export default function Settings() {
       <Sidebar userRole={user.role} />
 
       <div className="ml-64 p-8">
-        {/* Header */}
+        {/* HEADER */}
         <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -94,13 +119,13 @@ export default function Settings() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ---------------- PROFILE ---------------- */}
+          {/* PROFILE */}
           <TabsContent value="profile">
             <Card>
               <CardHeader>
                 <CardTitle>Profile Information</CardTitle>
                 <CardDescription>
-                  Basic account details
+                  Your account details
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -140,7 +165,7 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* ---------------- NOTIFICATIONS ---------------- */}
+          {/* NOTIFICATIONS */}
           <TabsContent value="notifications">
             <Card>
               <CardHeader>
@@ -188,13 +213,13 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* ---------------- SECURITY ---------------- */}
+          {/* SECURITY */}
           <TabsContent value="security">
             <Card>
               <CardHeader>
                 <CardTitle>Security</CardTitle>
                 <CardDescription>
-                  Account protection settings
+                  Account protection
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -203,7 +228,7 @@ export default function Settings() {
                     Account Secure
                   </p>
                   <p className="text-sm text-green-700">
-                    Industry-standard protection enabled
+                    Firebase authentication enabled
                   </p>
                 </div>
 

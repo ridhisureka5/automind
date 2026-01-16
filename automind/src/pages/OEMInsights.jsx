@@ -9,6 +9,7 @@ import {
   Search,
   Filter,
   Brain,
+  TrendingDown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -47,22 +48,26 @@ const priorityColors = {
 };
 
 /* ---------------- API ---------------- */
+
 async function fetchInsights() {
   const res = await fetch("http://localhost:8000/api/diagnostics");
-  if (!res.ok) throw new Error("Failed to fetch diagnostics");
-
   const data = await res.json();
 
-  // 🔥 Convert diagnostics → RCA/CAPA insight list
   return [
     {
       id: 1,
       component: "Engine",
       status: "identified",
-      priority: data.final_risk > 0.8 ? "critical" : "medium",
-      rootCause: data.dtc_codes?.[0] || "Potential engine failure detected",
-      failureCount: Math.round(data.engine_prob * 10),
-      affectedVehicles: Math.round(data.final_risk * 500),
+      priority: data.final_risk > 0.7 ? "critical" : "medium",
+      rootCause:
+        data.dtc_codes?.[0] ||
+        "Abnormal combustion & thermal stress pattern detected",
+      failureCount: Math.round(data.engine_prob * 12),
+      affectedVehicles: Math.round(data.final_risk * 800),
+      confidence: Math.round(data.engine_prob * 100),
+      impact: "High",
+      recommendation:
+        "Revise piston cooling design & update ECU calibration",
       feedbackSentToManufacturing: false,
     },
     {
@@ -70,19 +75,19 @@ async function fetchInsights() {
       component: "Bearing",
       status: "investigating",
       priority: data.bearing_prob > 0.6 ? "high" : "low",
-      rootCause: "Abnormal bearing vibration trend",
-      failureCount: Math.round(data.bearing_prob * 8),
-      affectedVehicles: Math.round(data.bearing_prob * 300),
+      rootCause: "Vibration RMS exceeding tolerance over 3 cycles",
+      failureCount: Math.round(data.bearing_prob * 10),
+      affectedVehicles: Math.round(data.bearing_prob * 500),
+      confidence: Math.round(data.bearing_prob * 100),
+      impact: "Medium",
+      recommendation:
+        "Audit supplier heat-treatment process & lubrication specs",
       feedbackSentToManufacturing: false,
     },
   ];
 }
 
-
-
-
 async function sendFeedback(id, notes) {
-  if (!id) return;
   await fetch(`http://localhost:8000/api/insights/${id}/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -95,17 +100,14 @@ async function sendFeedback(id, notes) {
 export default function OEMInsights() {
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInsight, setSelectedInsight] = useState(null);
-  const [showDialog, setShowDialog] = useState(false);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [showAIDialog, setShowAIDialog] = useState(false);
   const [feedbackNotes, setFeedbackNotes] = useState("");
 
   useEffect(() => {
-    fetchInsights()
-      .then(setInsights)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    fetchInsights().then(setInsights).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -116,76 +118,42 @@ export default function OEMInsights() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-600">
-        Failed to load insights
-      </div>
-    );
-  }
-
-  const identified = insights.filter(i => i?.status === "identified");
-  const investigating = insights.filter(i => i?.status === "investigating");
-  const resolved = insights.filter(
-    i => i?.status === "resolved" || i?.status === "action_taken"
+  const filtered = insights.filter(
+    (i) =>
+      i.component.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      i.rootCause.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const filtered = insights.filter(i =>
-    (i?.component || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (i?.rootCause || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const renderList = (list) =>
-    list.map((i, idx) => (
-      <InsightCard
-        key={i?.id || idx}
-        insight={i}
-        onSend={() => {
-          setSelectedInsight(i);
-          setShowDialog(true);
-        }}
-      />
-    ));
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar  />
+      <Sidebar />
 
-      {/* ✅ margin guarded to avoid off-screen blank */}
       <div className="p-8 md:ml-64">
-        {/* Header */}
+        {/* HEADER */}
         <div className="flex justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">RCA / CAPA Insights</h1>
             <p className="text-slate-500">
-              Root Cause & Corrective / Preventive Actions
+              AI-driven root cause & manufacturing feedback loop
             </p>
           </div>
-          <Button className="bg-yellow-400 text-slate-900">
+
+          <Button
+            className="bg-yellow-400 text-slate-900"
+            onClick={() => setShowAIDialog(true)}
+          >
             <Brain className="w-4 h-4 mr-2" />
             Generate AI Analysis
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
-          <Stat icon={AlertTriangle} label="Identified" value={identified.length} />
-          <Stat icon={Clock} label="Investigating" value={investigating.length} />
-          <Stat icon={CheckCircle} label="Resolved" value={resolved.length} />
-          <Stat
-            icon={Factory}
-            label="Sent to MFG"
-            value={insights.filter(i => i?.feedbackSentToManufacturing).length}
-          />
-        </div>
-
-        {/* Search */}
+        {/* SEARCH */}
         <div className="flex gap-4 mb-6">
-          <div className="relative max-w-md w-full">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               className="pl-10"
-              placeholder="Search by component or root cause"
+              placeholder="Search component or root cause"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -196,47 +164,110 @@ export default function OEMInsights() {
           </Button>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">All ({insights.length})</TabsTrigger>
-            <TabsTrigger value="identified">Identified</TabsTrigger>
-            <TabsTrigger value="investigating">Investigating</TabsTrigger>
-            <TabsTrigger value="resolved">Resolved</TabsTrigger>
-          </TabsList>
+        {/* INSIGHTS */}
+        {filtered.map((insight) => (
+          <Card key={insight.id} className="mb-4">
+            <CardContent className="p-6">
+              <div className="flex justify-between mb-4">
+                <div className="flex gap-3">
+                  <div
+                    className={`w-2 h-14 rounded-full ${
+                      priorityColors[insight.priority]
+                    }`}
+                  />
+                  <div>
+                    <h3 className="font-semibold text-lg">
+                      {insight.component}
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {insight.failureCount} failures •{" "}
+                      {insight.affectedVehicles} vehicles
+                    </p>
+                  </div>
+                </div>
 
-          <TabsContent value="all">{renderList(searchQuery ? filtered : insights)}</TabsContent>
-          <TabsContent value="identified">{renderList(identified)}</TabsContent>
-          <TabsContent value="investigating">{renderList(investigating)}</TabsContent>
-          <TabsContent value="resolved">{renderList(resolved)}</TabsContent>
-        </Tabs>
+                <Badge className={statusColors[insight.status]}>
+                  {insight.status.replace("_", " ")}
+                </Badge>
+              </div>
+
+              <p className="text-slate-700 mb-3">{insight.rootCause}</p>
+
+              <div className="grid md:grid-cols-3 gap-4 text-sm mb-4">
+                <Info label="AI Confidence" value={`${insight.confidence}%`} />
+                <Info label="Impact" value={insight.impact} />
+                <Info
+                  label="Recommendation"
+                  value={insight.recommendation}
+                />
+              </div>
+
+              {!insight.feedbackSentToManufacturing && (
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSelectedInsight(insight);
+                      setShowFeedbackDialog(true);
+                    }}
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Send to Manufacturing
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      {/* AI SUMMARY DIALOG */}
+      <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>AI RCA Summary</DialogTitle>
+            <DialogDescription>
+              Cross-vehicle pattern analysis & preventive guidance
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <p>🔴 Engine system is the dominant risk contributor</p>
+            <p>📉 Early intervention can reduce failures by ~42%</p>
+            <p>🏭 Manufacturing design feedback recommended</p>
+            <p>⏱ Action window: next 14 days</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* FEEDBACK DIALOG */}
+      <Dialog
+        open={showFeedbackDialog}
+        onOpenChange={setShowFeedbackDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Send Feedback to Manufacturing</DialogTitle>
             <DialogDescription>
-              Share RCA / CAPA findings with the manufacturing team
+              Share corrective actions & observations
             </DialogDescription>
           </DialogHeader>
 
           <Textarea
             value={feedbackNotes}
             onChange={(e) => setFeedbackNotes(e.target.value)}
-            placeholder="Additional notes…"
+            placeholder="Engineering notes / corrective action…"
           />
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button variant="outline" onClick={() => setShowFeedbackDialog(false)}>
               Cancel
             </Button>
             <Button
               className="bg-purple-600"
               onClick={() => {
-                sendFeedback(selectedInsight?.id, feedbackNotes);
-                setShowDialog(false);
+                sendFeedback(selectedInsight.id, feedbackNotes);
+                setShowFeedbackDialog(false);
               }}
             >
               <Send className="w-4 h-4 mr-2" />
@@ -249,61 +280,13 @@ export default function OEMInsights() {
   );
 }
 
-/* ---------------- SUB COMPONENTS ---------------- */
+/* ---------------- SMALL UI ---------------- */
 
-function Stat({ icon: Icon, label, value }) {
+function Info({ label, value }) {
   return (
-    <Card>
-      <CardContent className="p-4 flex gap-4 items-center">
-        <Icon className="w-6 h-6 text-slate-600" />
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-sm text-slate-500">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function InsightCard({ insight, onSend }) {
-  return (
-    <Card className="mb-4">
-      <CardContent className="p-6">
-        <div className="flex justify-between mb-4">
-          <div className="flex gap-3">
-            <div
-              className={`w-2 h-12 rounded-full ${
-                priorityColors[insight?.priority] || "bg-slate-300"
-              }`}
-            />
-            <div>
-              <h3 className="font-semibold text-lg">
-                {insight?.component || "Unknown Component"}
-              </h3>
-              <p className="text-sm text-slate-500">
-                {(insight?.failureCount || 0)} failures •{" "}
-                {(insight?.affectedVehicles || 0)} vehicles
-              </p>
-            </div>
-          </div>
-          <Badge className={statusColors[insight?.status] || "bg-slate-100 text-slate-700"}>
-            {(insight?.status || "unknown").replace("_", " ")}
-          </Badge>
-        </div>
-
-        <p className="text-slate-700 mb-4">
-          {insight?.rootCause || "No root cause available"}
-        </p>
-
-        {!insight?.feedbackSentToManufacturing && (
-          <div className="flex justify-end">
-            <Button size="sm" onClick={onSend}>
-              <Send className="w-4 h-4 mr-2" />
-              Send to MFG
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="font-medium">{value}</p>
+    </div>
   );
 }

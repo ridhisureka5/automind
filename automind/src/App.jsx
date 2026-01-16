@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import ProtectedRoute from "./routes/ProtectedRoute.jsx";
+
 
 // Landing sections
 import HeroSection from "./components/landing/HeroSection.jsx";
@@ -55,9 +55,9 @@ export default function App() {
       <Route
         path="/role-selection"
         element={
-          <ProtectedRoute>
+         
             <RoleSelection />
-          </ProtectedRoute>
+          
         }
       />
 
@@ -65,9 +65,9 @@ export default function App() {
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+         
             <Dashboard />
-          </ProtectedRoute>
+          
         }
       />
 
@@ -75,25 +75,25 @@ export default function App() {
       <Route
         path="/customer/dashboard"
         element={
-          <ProtectedRoute>
+         
             <CustomerDashboard />
-          </ProtectedRoute>
+     
         }
       />
       <Route
         path="/customer/services"
         element={
-          <ProtectedRoute>
+        
             <CustomerServices />
-          </ProtectedRoute>
+          
         }
       />
       <Route
         path="/customer/alerts"
         element={
-          <ProtectedRoute>
+       
             <CustomerAlerts />
-          </ProtectedRoute>
+         
         }
       />
 
@@ -101,33 +101,33 @@ export default function App() {
       <Route
         path="/oem/dashboard"
         element={
-          <ProtectedRoute>
+        
             <OEMDashboard />
-          </ProtectedRoute>
+    
         }
       />
       <Route
         path="/oem/analytics"
         element={
-          <ProtectedRoute>
+        
             <OEMAnalytics />
-          </ProtectedRoute>
+          
         }
       />
       <Route
         path="/oem/insights"
         element={
-          <ProtectedRoute>
+        
             <OEMInsights />
-          </ProtectedRoute>
+       
         }
       />
       <Route
         path="/oem/security"
         element={
-          <ProtectedRoute>
+         
             <OEMSecurity />
-          </ProtectedRoute>
+         
         }
       />
 
@@ -135,33 +135,34 @@ export default function App() {
       <Route
         path="/service/dashboard"
         element={
-          <ProtectedRoute>
+       
             <ServiceDashboard />
-          </ProtectedRoute>
+           
+          
         }
       />
       <Route
         path="/service/inventory"
         element={
-          <ProtectedRoute>
+          
             <ServiceInventory />
-          </ProtectedRoute>
+         
         }
       />
       <Route
         path="/service/schedule"
         element={
-          <ProtectedRoute>
+        
             <ServiceSchedule />
-          </ProtectedRoute>
+         
         }
       />
       <Route
         path="/service/technicians"
         element={
-          <ProtectedRoute>
+       
             <ServiceTechnicians />
-          </ProtectedRoute>
+          
         }
       />
 
@@ -169,9 +170,9 @@ export default function App() {
       <Route
         path="/settings"
         element={
-          <ProtectedRoute>
+         
             <Settings />
-          </ProtectedRoute>
+        
         }
       />
     </Routes>

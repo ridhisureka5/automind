@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Sidebar from "../components/dashboard/Sidebar";
 
 import {
   Calendar,
   Clock,
-  CheckCircle,
   MapPin,
   Car,
   Wrench,
   Star,
-  MessageSquare,
   Plus,
 } from "lucide-react";
 
@@ -32,11 +30,22 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 
+/* ---------------- CONSTANTS ---------------- */
+
 const statusColors = {
   scheduled: "bg-blue-100 text-blue-700",
   in_progress: "bg-yellow-100 text-yellow-700",
   completed: "bg-green-100 text-green-700",
 };
+
+const serviceCenters = [
+  "AutoMind Service Center – Rajouri Garden",
+  "AutoMind Service Center – Shalimar Bagh",
+  "AutoMind Service Center – Vaishali",
+  "AutoMind Service Center – Sonipat",
+];
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function CustomerServices() {
   const [services, setServices] = useState([]);
@@ -46,10 +55,10 @@ export default function CustomerServices() {
 
   const [bookingForm, setBookingForm] = useState({
     serviceType: "Predictive Maintenance",
-    serviceCenterName: "AutoMind Authorized Service",
+    serviceCenterName: serviceCenters[0],
     scheduledDate: "",
     timeSlot: "",
-    estimatedCost: 180,
+    estimatedCost: 4500, // INR default
   });
 
   const upcomingServices = services.filter(
@@ -65,19 +74,16 @@ export default function CustomerServices() {
 
       <main className="ml-64 p-8">
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Service History
-            </h1>
-            <p className="text-slate-500 mt-1">
+            <h1 className="text-3xl font-bold">Service History</h1>
+            <p className="text-slate-500">
               ML-driven predictive service scheduling
             </p>
           </div>
 
-          {/* BOOK SERVICE BUTTON */}
           <Button
-            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900"
+            className="bg-yellow-400 text-slate-900"
             onClick={() => setShowBookingDialog(true)}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -87,7 +93,7 @@ export default function CustomerServices() {
 
         {/* TABS */}
         <Tabs defaultValue="upcoming">
-          <TabsList className="bg-white border border-slate-200">
+          <TabsList className="bg-white border">
             <TabsTrigger value="upcoming">
               Upcoming ({upcomingServices.length})
             </TabsTrigger>
@@ -96,17 +102,17 @@ export default function CustomerServices() {
             </TabsTrigger>
           </TabsList>
 
-          {/* UPCOMING */}
-          <TabsContent value="upcoming" className="space-y-4 mt-6">
+          {/* UPCOMING SERVICES */}
+          <TabsContent value="upcoming" className="mt-6 space-y-4">
             {upcomingServices.length > 0 ? (
               upcomingServices.map((service, index) => (
                 <motion.div
                   key={service.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  transition={{ delay: index * 0.05 }}
                 >
-                  <Card className="border-slate-100">
+                  <Card>
                     <CardContent className="p-6">
                       <div className="flex justify-between mb-4">
                         <div className="flex gap-4">
@@ -128,26 +134,17 @@ export default function CustomerServices() {
                       </div>
 
                       <div className="grid md:grid-cols-3 gap-4 mb-4">
-                        <InfoItem
-                          icon={Calendar}
-                          text={service.scheduledDate || "TBD"}
-                        />
-                        <InfoItem
-                          icon={Clock}
-                          text={service.timeSlot || "TBD"}
-                        />
-                        <InfoItem
-                          icon={MapPin}
-                          text="Nearest OEM Center"
-                        />
+                        <InfoItem icon={Calendar} text={service.scheduledDate} />
+                        <InfoItem icon={Clock} text={service.timeSlot} />
+                        <InfoItem icon={MapPin} text={service.serviceCenterName} />
                       </div>
 
                       <div className="flex justify-between border-t pt-4">
                         <span className="text-sm text-slate-500">
-                          Estimated Cost:
+                          Estimated Cost
                         </span>
                         <span className="font-semibold">
-                          ${service.estimatedCost}
+                          ₹ {service.estimatedCost.toLocaleString("en-IN")}
                         </span>
                       </div>
                     </CardContent>
@@ -160,7 +157,7 @@ export default function CustomerServices() {
           </TabsContent>
 
           {/* COMPLETED */}
-          <TabsContent value="completed" className="space-y-4 mt-6">
+          <TabsContent value="completed" className="mt-6">
             {completedServices.length === 0 && (
               <Empty text="No completed services yet" />
             )}
@@ -174,38 +171,34 @@ export default function CustomerServices() {
           <DialogHeader>
             <DialogTitle>Book Service</DialogTitle>
             <DialogDescription>
-              Enter service details to schedule maintenance
+              Schedule maintenance with nearest service center
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* DATE */}
             <input
               type="date"
               className="w-full p-3 border rounded-xl"
               value={bookingForm.scheduledDate}
               onChange={(e) =>
-                setBookingForm({
-                  ...bookingForm,
-                  scheduledDate: e.target.value,
-                })
+                setBookingForm({ ...bookingForm, scheduledDate: e.target.value })
               }
             />
 
+            {/* TIME */}
             <input
               type="time"
               className="w-full p-3 border rounded-xl"
               value={bookingForm.timeSlot}
               onChange={(e) =>
-                setBookingForm({
-                  ...bookingForm,
-                  timeSlot: e.target.value,
-                })
+                setBookingForm({ ...bookingForm, timeSlot: e.target.value })
               }
             />
 
-            <input
+            {/* SERVICE CENTER DROPDOWN */}
+            <select
               className="w-full p-3 border rounded-xl"
-              placeholder="Service Center"
               value={bookingForm.serviceCenterName}
               onChange={(e) =>
                 setBookingForm({
@@ -213,27 +206,31 @@ export default function CustomerServices() {
                   serviceCenterName: e.target.value,
                 })
               }
-            />
+            >
+              {serviceCenters.map((center) => (
+                <option key={center} value={center}>
+                  {center}
+                </option>
+              ))}
+            </select>
 
+            {/* COST */}
             <input
               type="number"
               className="w-full p-3 border rounded-xl"
-              placeholder="Estimated Cost"
+              placeholder="Estimated Cost (₹)"
               value={bookingForm.estimatedCost}
               onChange={(e) =>
                 setBookingForm({
                   ...bookingForm,
-                  estimatedCost: e.target.value,
+                  estimatedCost: Number(e.target.value),
                 })
               }
             />
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowBookingDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowBookingDialog(false)}>
               Cancel
             </Button>
             <Button
@@ -243,12 +240,9 @@ export default function CustomerServices() {
                   ...prev,
                   {
                     id: Date.now(),
-                    serviceType: bookingForm.serviceType,
-                    serviceCenterName: bookingForm.serviceCenterName,
+                    ...bookingForm,
                     status: "scheduled",
-                    scheduledDate: bookingForm.scheduledDate,
-                    timeSlot: bookingForm.timeSlot,
-                    estimatedCost: bookingForm.estimatedCost,
+                    estimatedCost: Number(bookingForm.estimatedCost),
                   },
                 ]);
                 setShowBookingDialog(false);
@@ -285,12 +279,7 @@ export default function CustomerServices() {
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowFeedbackDialog(false)}
-            >
-              Cancel
-            </Button>
+            <Button variant="outline">Cancel</Button>
             <Button className="bg-yellow-400 text-slate-900">
               Submit
             </Button>
@@ -301,7 +290,7 @@ export default function CustomerServices() {
   );
 }
 
-/* ===== Helpers (UI UNCHANGED) ===== */
+/* ---------------- HELPERS ---------------- */
 
 function InfoItem({ icon: Icon, text }) {
   return (
@@ -314,7 +303,7 @@ function InfoItem({ icon: Icon, text }) {
 
 function Empty({ text }) {
   return (
-    <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
+    <div className="bg-white p-12 rounded-2xl text-center">
       <Wrench className="w-14 h-14 text-slate-300 mx-auto mb-4" />
       <p className="text-slate-500">{text}</p>
     </div>

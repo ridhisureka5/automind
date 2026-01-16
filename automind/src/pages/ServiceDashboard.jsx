@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Sidebar from "../components/dashboard/Sidebar";
 import StatsCard from "../components/dashboard/StatsCard";
@@ -9,9 +9,6 @@ import {
   Package,
   Brain,
   Car,
-  ArrowRight,
-  CheckCircle,
-  AlertCircle,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -26,8 +23,15 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
-/* ---------------- MOCK DATA (API READY) ---------------- */
+/* ---------------- MOCK DATA ---------------- */
 
 const upcomingJobs = [
   {
@@ -38,8 +42,7 @@ const upcomingJobs = [
     severity: "high",
     time: "9:00 AM",
     aiConfidence: 94,
-    parts: ["Brake Pads (4)", "Brake Fluid"],
-    estimatedTime: "2 hours",
+    estimatedTime: 2,
   },
   {
     id: 2,
@@ -49,15 +52,14 @@ const upcomingJobs = [
     severity: "medium",
     time: "11:30 AM",
     aiConfidence: 89,
-    parts: ["Battery 12V"],
-    estimatedTime: "45 mins",
+    estimatedTime: 0.75,
   },
 ];
 
 const technicians = [
-  { name: "Robert Chen", status: "busy", job: "Engine Repair", progress: 75 },
-  { name: "Maria Garcia", status: "available", job: null, progress: 0 },
-  { name: "James Wilson", status: "busy", job: "Brake Service", progress: 45 },
+  { name: "Robert Chen", status: "busy", progress: 75 },
+  { name: "Maria Garcia", status: "available", progress: 0 },
+  { name: "James Wilson", status: "busy", progress: 45 },
 ];
 
 const demandForecast = [
@@ -84,12 +86,33 @@ const severityColors = {
 /* ---------------- COMPONENT ---------------- */
 
 export default function ServiceDashboard() {
+  const [showAIDialog, setShowAIDialog] = useState(false);
+
+  /* ---------------- AI LOGIC ---------------- */
+
+  const totalHours = upcomingJobs.reduce(
+    (sum, j) => sum + j.estimatedTime,
+    0
+  );
+
+  const availableTechs = technicians.filter(
+    (t) => t.status === "available"
+  ).length;
+
+  const overloadedDays = demandForecast.filter(
+    (d) => d.predicted > d.capacity
+  );
+
+  const criticalParts = partsInventory.filter(
+    (p) => p.status === "critical" || p.status === "low"
+  );
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Sidebar userRole="service" />
 
       <div className="p-8 md:ml-64">
-        {/* Header */}
+        {/* HEADER */}
         <div className="flex justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">
@@ -99,13 +122,16 @@ export default function ServiceDashboard() {
               Predictive scheduling & technician management
             </p>
           </div>
-          <Button className="bg-yellow-400 text-slate-900">
+          <Button
+            className="bg-yellow-400 text-slate-900"
+            onClick={() => setShowAIDialog(true)}
+          >
             <Brain className="w-4 h-4 mr-2" />
             AI Optimize
           </Button>
         </div>
 
-        {/* Stats */}
+        {/* STATS */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <StatsCard title="Today's Jobs" value={upcomingJobs.length} icon={Calendar} />
           <StatsCard title="Technicians" value="3 Active" icon={Users} />
@@ -113,44 +139,15 @@ export default function ServiceDashboard() {
           <StatsCard title="Parts Alerts" value="2" icon={Package} />
         </div>
 
-        {/* AI Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-8"
-        >
-          <div className="flex justify-between items-center">
-            <div className="flex gap-4 items-center">
-              <div className="w-14 h-14 bg-yellow-400 rounded-xl flex items-center justify-center">
-                <Brain className="w-7 h-7 text-slate-900" />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold">
-                  Scheduling AI Agent
-                </h3>
-                <p className="text-slate-400 text-sm">
-                  Optimizing capacity & parts availability
-                </p>
-              </div>
-            </div>
-            <Badge className="bg-green-500/20 text-green-400">
-              Optimizing
-            </Badge>
-          </div>
-        </motion.div>
-
+        {/* JOBS + TECH */}
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
-          {/* Jobs */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Today's Jobs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {upcomingJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="p-4 bg-slate-50 rounded-xl border"
-                >
+                <div key={job.id} className="p-4 bg-slate-50 rounded-xl border">
                   <div className="flex justify-between mb-2">
                     <div className="flex gap-3 items-center">
                       <Car className="w-5 h-5 text-yellow-600" />
@@ -172,7 +169,6 @@ export default function ServiceDashboard() {
             </CardContent>
           </Card>
 
-          {/* Technicians */}
           <Card>
             <CardHeader>
               <CardTitle>Technician Status</CardTitle>
@@ -184,11 +180,8 @@ export default function ServiceDashboard() {
                     <span className="font-medium">{tech.name}</span>
                     <Badge>{tech.status}</Badge>
                   </div>
-                  {tech.job && (
-                    <>
-                      <p className="text-xs text-slate-500">{tech.job}</p>
-                      <Progress value={tech.progress} className="h-2 mt-1" />
-                    </>
+                  {tech.status === "busy" && (
+                    <Progress value={tech.progress} className="h-2 mt-1" />
                   )}
                 </div>
               ))}
@@ -196,7 +189,7 @@ export default function ServiceDashboard() {
           </Card>
         </div>
 
-        {/* Demand + Parts */}
+        {/* CHARTS */}
         <div className="grid lg:grid-cols-2 gap-8">
           <Card>
             <CardHeader>
@@ -210,12 +203,7 @@ export default function ServiceDashboard() {
                   <YAxis />
                   <Tooltip />
                   <Area dataKey="predicted" stroke="#eab308" fill="#fef3c7" />
-                  <Area
-                    dataKey="capacity"
-                    stroke="#22c55e"
-                    fill="#dcfce7"
-                    strokeDasharray="5 5"
-                  />
+                  <Area dataKey="capacity" stroke="#22c55e" fill="#dcfce7" />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -246,6 +234,49 @@ export default function ServiceDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* ---------------- AI OPTIMIZATION DIALOG ---------------- */}
+      <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>AI Optimization Summary</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <p>🛠 Total service load today: {totalHours.toFixed(1)} hours</p>
+            <p>👨‍🔧 Available technicians: {availableTechs}</p>
+
+            {overloadedDays.length > 0 && (
+              <p className="text-orange-600">
+                ⚠ Capacity overload expected on{" "}
+                {overloadedDays.map((d) => d.day).join(", ")}
+              </p>
+            )}
+
+            {criticalParts.length > 0 && (
+              <p className="text-red-600">
+                ❗ Parts risk:{" "}
+                {criticalParts.map((p) => p.name).join(", ")}
+              </p>
+            )}
+
+            <p className="font-semibold mt-3">AI Recommendation</p>
+            <p>
+              Reassign low-severity jobs to available technicians and
+              initiate parts reorder to prevent delays.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAIDialog(false)}>
+              Close
+            </Button>
+            <Button className="bg-yellow-400 text-slate-900">
+              Apply Optimization
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

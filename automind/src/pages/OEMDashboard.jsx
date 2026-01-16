@@ -1,34 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Sidebar from "@/components/dashboard/Sidebar";
 import StatsCard from "@/components/dashboard/StatsCard";
 import {
   Activity,
-  DollarSign,
   TrendingUp,
   Brain,
   AlertTriangle,
   Factory,
-  ArrowRight,
-  CheckCircle,
+  Car,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 /* ---------------- API ---------------- */
 
@@ -38,76 +28,61 @@ async function fetchDiagnostics() {
   return res.json();
 }
 
-/* ---------------- STATIC CHART DATA ---------------- */
+/* ---------------- HELPERS ---------------- */
 
-const failureTrendData = [
-  { month: "Jan", failures: 45, predicted: 38 },
-  { month: "Feb", failures: 52, predicted: 45 },
-  { month: "Mar", failures: 38, predicted: 35 },
-  { month: "Apr", failures: 42, predicted: 40 },
-  { month: "May", failures: 35, predicted: 32 },
-  { month: "Jun", failures: 28, predicted: 25 },
-];
+function getVehicleStatus(health) {
+  if (health < 40) return "Critical";
+  if (health < 70) return "Warning";
+  return "Healthy";
+}
 
-const fleetHealthDistribution = [
-  { name: "Excellent", value: 45, color: "#22c55e" },
-  { name: "Good", value: 30, color: "#eab308" },
-  { name: "Fair", value: 15, color: "#f97316" },
-  { name: "Poor", value: 10, color: "#ef4444" },
-];
+function statusColor(status) {
+  if (status === "Critical") return "bg-red-100 text-red-700";
+  if (status === "Warning") return "bg-yellow-100 text-yellow-700";
+  return "bg-green-100 text-green-700";
+}
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function OEMDashboard() {
   const [ml, setMl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [showAI, setShowAI] = useState(false);
 
   useEffect(() => {
     fetchDiagnostics()
-      .then((data) => {
-        setMl(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
+      .then(setMl)
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading ML analytics…
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
   }
 
-  if (error || !ml) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-600">
-        Failed to load ML diagnostics
-      </div>
-    );
-  }
-
-  const riskPercent = Math.round(ml.final_risk * 100);
-  const stressPercent = Math.round(ml.stress_index * 100);
+  /* ---------------- MOCK FLEET (REALISTIC) ---------------- */
+  const fleet = [
+    { id: 1, vin: "DEF-2047", model: "Defender", health: Math.round((1 - ml.final_risk) * 100) },
+    { id: 2, vin: "CAR-1123", model: "Carens", health: 72 },
+    { id: 3, vin: "FOR-9988", model: "Fortuner", health: 58 },
+    { id: 4, vin: "CRE-4501", model: "Creta", health: 34 },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar  />
+      <Sidebar />
 
       <div className="ml-64 p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        {/* HEADER */}
+        <div className="flex justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              OEM Dashboard
-            </h1>
-            <p className="text-slate-500 mt-1">
-              ML-driven fleet analytics
-            </p>
+            <h1 className="text-3xl font-bold">OEM Dashboard</h1>
+            <p className="text-slate-500">Fleet-level AI analytics</p>
           </div>
-          <Button className="bg-yellow-400 hover:bg-yellow-500 text-slate-900">
+
+          <Button
+            className="bg-yellow-400 text-slate-900"
+            onClick={() => setShowAI(true)}
+          >
             <Brain className="w-4 h-4 mr-2" />
             AI Analysis
           </Button>
@@ -117,108 +92,91 @@ export default function OEMDashboard() {
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <StatsCard
             title="Final Risk"
-            value={`${riskPercent}%`}
+            value={`${Math.round(ml.final_risk * 100)}%`}
             icon={AlertTriangle}
             color="red"
           />
           <StatsCard
             title="Stress Index"
-            value={`${stressPercent}%`}
+            value={`${Math.round(ml.stress_index * 100)}%`}
             icon={Activity}
             color="yellow"
           />
           <StatsCard
-            title="Engine Failure Prob."
+            title="Engine Failure"
             value={`${Math.round(ml.engine_prob * 100)}%`}
             icon={TrendingUp}
             color="purple"
           />
           <StatsCard
-            title="Bearing Failure Prob."
+            title="Bearing Failure"
             value={`${Math.round(ml.bearing_prob * 100)}%`}
             icon={Factory}
             color="blue"
           />
         </div>
 
-        {/* Status */}
-        <Card className="mb-8">
-          <CardContent className="flex justify-between items-center p-6">
-            <span className="font-semibold">Vehicle Status</span>
-            <Badge
-              className={
-                ml.vehicle_status === "Critical"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-green-100 text-green-700"
-              }
-            >
-              {ml.vehicle_status}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        {/* Charts */}
-        <div className="grid lg:grid-cols-3 gap-8 mb-8">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Failure Trends vs Prediction</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={failureTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line dataKey="failures" stroke="#ef4444" />
-                  <Line dataKey="predicted" stroke="#22c55e" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Fleet Health</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={fleetHealthDistribution}
-                    dataKey="value"
-                    innerRadius={50}
-                    outerRadius={80}
-                  >
-                    {fleetHealthDistribution.map((e, i) => (
-                      <Cell key={i} fill={e.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* DTC Codes */}
+        {/* FLEET STATUS LIST */}
         <Card>
           <CardHeader>
-            <CardTitle>DTC Codes</CardTitle>
+            <CardTitle>Fleet Vehicle Status</CardTitle>
           </CardHeader>
-          <CardContent>
-            {ml.dtc_codes.length ? (
-              <ul className="list-disc pl-6">
-                {ml.dtc_codes.map((code, i) => (
-                  <li key={i}>{code}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-slate-500">No DTC codes</p>
-            )}
+          <CardContent className="space-y-3">
+            {fleet.map((v) => {
+              const status = getVehicleStatus(v.health);
+              return (
+                <div
+                  key={v.id}
+                  className="flex justify-between items-center p-3 border rounded-lg"
+                >
+                  <div className="flex gap-3 items-center">
+                    <Car className="w-5 h-5 text-slate-500" />
+                    <div>
+                      <p className="font-medium">{v.model}</p>
+                      <p className="text-xs text-slate-500">VIN: {v.vin}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-center">
+                    <span className="text-sm font-semibold">
+                      {v.health}%
+                    </span>
+                    <Badge className={statusColor(status)}>
+                      {status}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>
+
+      {/* AI ANALYSIS DIALOG */}
+      <Dialog open={showAI} onOpenChange={setShowAI}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>AI Fleet Analysis</DialogTitle>
+            <DialogDescription>
+              ML-driven insights and recommendations
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-4 text-sm">
+            <p>🔴 High-risk vehicles detected</p>
+            <p>🟡 2 vehicles require preventive maintenance</p>
+            <p>🟢 Remaining fleet healthy</p>
+
+            <div className="bg-slate-100 rounded-lg p-3 mt-3">
+              <p className="font-semibold mb-1">AI Recommendation</p>
+              <p>
+                Schedule service for vehicles below 60% health within 7 days to
+                prevent breakdowns.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

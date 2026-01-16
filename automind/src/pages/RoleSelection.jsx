@@ -4,7 +4,7 @@ import { Car, Factory, Wrench, Brain, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/firebase";
+import { auth } from "../firebase";
 
 /* ---------------- ROLES ---------------- */
 
@@ -80,43 +80,48 @@ const colorClasses = {
   },
 };
 
+/* ---------------- COMPONENT ---------------- */
+
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  /* ---------------- AUTH CHECK ONLY ---------------- */
-  /* ❌ NO auto-dashboard redirect here */
+  /* ---------------- AUTH CHECK ---------------- */
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         navigate("/login", { replace: true });
         return;
       }
 
-      // ✅ User logged in → allow role selection
-      setCheckingAuth(false);
+      const savedRole = localStorage.getItem("userRole");
+      if (savedRole) {
+        navigate(`/${savedRole}/dashboard`, { replace: true });
+        return;
+      }
+
+      setLoading(false);
     });
 
-    return () => unsub();
+    return () => unsubscribe();
   }, [navigate]);
 
   /* ---------------- CONTINUE ---------------- */
 
   const handleContinue = () => {
     if (!selectedRole) return;
-
     localStorage.setItem("userRole", selectedRole.id);
     navigate(selectedRole.route);
   };
 
-  /* ---------------- LOADING ---------------- */
+  /* ---------------- LOADER ---------------- */
 
-  if (checkingAuth) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="animate-spin h-8 w-8 border-b-2 border-yellow-400 rounded-full" />
+        <div className="animate-spin h-10 w-10 border-b-2 border-yellow-400 rounded-full" />
       </div>
     );
   }
@@ -128,7 +133,7 @@ export default function RoleSelection() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-5xl relative"
+        className="w-full max-w-5xl"
       >
         {/* Header */}
         <div className="text-center mb-12">
@@ -146,63 +151,50 @@ export default function RoleSelection() {
           </p>
         </div>
 
-        {/* Role Cards */}
+        {/* Roles */}
         <div className="grid md:grid-cols-3 gap-6 mb-10">
           {roles.map((role) => {
             const colors = colorClasses[role.color];
             const isSelected = selectedRole?.id === role.id;
+            const Icon = role.icon;
 
             return (
               <div
                 key={role.id}
                 onClick={() => setSelectedRole(role)}
-                className={`relative cursor-pointer rounded-2xl p-6 border-2 transition-all duration-300 ${
+                className={`relative cursor-pointer rounded-2xl p-6 border-2 transition-all ${
                   isSelected
                     ? `${colors.bg} ${colors.border} ring-4 ${colors.ring} ring-opacity-30`
                     : `bg-slate-800/50 border-slate-700 ${colors.hover}`
                 }`}
               >
                 {isSelected && (
-                  <div
-                    className={`absolute -top-3 -right-3 w-8 h-8 ${colors.icon} rounded-full flex items-center justify-center`}
-                  >
+                  <div className={`absolute -top-3 -right-3 w-8 h-8 ${colors.icon} rounded-full flex items-center justify-center`}>
                     <Check className="w-5 h-5 text-white" />
                   </div>
                 )}
 
-                <div
-                  className={`w-14 h-14 ${colors.icon} rounded-xl flex items-center justify-center mb-5`}
-                >
-                  <role.icon className="w-7 h-7 text-white" />
+                <div className={`w-14 h-14 ${colors.icon} rounded-xl flex items-center justify-center mb-5`}>
+                  <Icon className="w-7 h-7 text-white" />
                 </div>
 
-                <h3
-                  className={`text-xl font-bold mb-2 ${
-                    isSelected ? "text-slate-900" : "text-white"
-                  }`}
-                >
+                <h3 className={`text-xl font-bold mb-2 ${isSelected ? "text-slate-900" : "text-white"}`}>
                   {role.title}
                 </h3>
 
-                <p
-                  className={`text-sm mb-5 ${
-                    isSelected ? "text-slate-600" : "text-slate-400"
-                  }`}
-                >
+                <p className={`text-sm mb-5 ${isSelected ? "text-slate-600" : "text-slate-400"}`}>
                   {role.description}
                 </p>
 
                 <ul className="space-y-2">
-                  {role.features.map((feature, i) => (
+                  {role.features.map((feature, index) => (
                     <li
-                      key={i}
+                      key={index}
                       className={`flex items-center gap-2 text-sm ${
                         isSelected ? "text-slate-700" : "text-slate-400"
                       }`}
                     >
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full ${colors.icon}`}
-                      />
+                      <div className={`w-1.5 h-1.5 rounded-full ${colors.icon}`} />
                       {feature}
                     </li>
                   ))}
@@ -212,22 +204,18 @@ export default function RoleSelection() {
           })}
         </div>
 
-        {/* Continue Button */}
+        {/* Continue */}
         <div className="flex justify-center">
           <Button
             size="lg"
             onClick={handleContinue}
             disabled={!selectedRole}
-            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 px-12 py-7 text-lg rounded-xl disabled:opacity-50"
+            className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 px-12 py-7 text-lg rounded-xl"
           >
             Continue
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
-
-        <p className="text-center text-slate-500 mt-6 text-sm">
-          Role is selected once and validated by backend after login
-        </p>
       </motion.div>
     </div>
   );

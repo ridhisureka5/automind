@@ -27,17 +27,22 @@ import {
   DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
-import { Input } from "../components/ui/input.tsx";
+import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 
 import { fetchDiagnostics } from "../services/diagnosticsApi";
+
+/* ---------------- HELPER ---------------- */
+
+const randomHealth = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
 
 export default function CustomerDashboard() {
   const [vehicles, setVehicles] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* ✅ ADD VEHICLE STATE */
+  /* ADD VEHICLE STATE */
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
   const [newVehicle, setNewVehicle] = useState({
     make: "",
@@ -53,6 +58,8 @@ export default function CustomerDashboard() {
     loadMLData();
   }, []);
 
+  /* ---------------- LOAD ML VEHICLE ---------------- */
+
   const loadMLData = async () => {
     setIsLoading(true);
 
@@ -60,17 +67,21 @@ export default function CustomerDashboard() {
 
     const mlVehicle = {
       id: Date.now(),
-      make: "OEM",
-      model: "Predictive-X",
+      name: "Land Rover Defender",
+      make: "Land Rover",
+      model: "Defender",
       year: 2024,
       licensePlate: "AI-2047",
       mileage: 42150,
+
       healthScore: Math.round((1 - ml.final_risk) * 100),
+
       components: [
         { name: "Engine", health: Math.round((1 - ml.engine_prob) * 100) },
         { name: "Bearings", health: Math.round((1 - ml.bearing_prob) * 100) },
         { name: "Stress", health: Math.round((1 - ml.stress_index) * 100) },
       ],
+
       telemetryData: {
         engineTemp: 98,
         oilPressure: 64,
@@ -93,19 +104,48 @@ export default function CustomerDashboard() {
     setIsLoading(false);
   };
 
-  /* ✅ ADD VEHICLE HANDLER */
+  /* ---------------- ADD VEHICLE (REALISTIC HEALTH) ---------------- */
+
   const handleAddVehicle = () => {
+    if (!newVehicle.make || !newVehicle.model) return;
+
+    const engineHealth = randomHealth(70, 95);
+    const batteryHealth = randomHealth(75, 98);
+    const brakeHealth = randomHealth(65, 92);
+
+    const avgHealth = Math.round(
+      (engineHealth + batteryHealth + brakeHealth) / 3
+    );
+
     const vehicle = {
       id: Date.now(),
-      ...newVehicle,
-      mileage: 0,
-      healthScore: 100,
-      components: [],
-      telemetryData: {},
+      name: `${newVehicle.make} ${newVehicle.model}`,
+      make: newVehicle.make,
+      model: newVehicle.model,
+      year: newVehicle.year,
+      licensePlate: newVehicle.licensePlate,
+      vin: newVehicle.vin,
+
+      mileage: randomHealth(5000, 120000),
+      healthScore: avgHealth,
+
+      components: [
+        { name: "Engine", health: engineHealth },
+        { name: "Battery", health: batteryHealth },
+        { name: "Brakes", health: brakeHealth },
+      ],
+
+      telemetryData: {
+        engineTemp: randomHealth(85, 110),
+        oilPressure: randomHealth(50, 75),
+        batteryVoltage: (Math.random() * (12.8 - 12.2) + 12.2).toFixed(1),
+        brakeWear: randomHealth(10, 70),
+      },
     };
 
     setVehicles((prev) => [...prev, vehicle]);
     setShowAddVehicleDialog(false);
+
     setNewVehicle({
       make: "",
       model: "",
@@ -114,6 +154,8 @@ export default function CustomerDashboard() {
       vin: "",
     });
   };
+
+  /* ---------------- STATS ---------------- */
 
   const avgHealthScore =
     vehicles.length > 0
@@ -129,15 +171,13 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar  />
+      <Sidebar />
 
       <main className="ml-64 p-8">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Welcome back!
-            </h1>
+            <h1 className="text-3xl font-bold">Welcome back!</h1>
             <p className="text-slate-500 mt-1">
               Here's your vehicle health overview
             </p>
@@ -205,7 +245,14 @@ export default function CustomerDashboard() {
             {isLoading ? (
               <Skeleton className="h-80 rounded-2xl" />
             ) : (
-              <VehicleHealthCard vehicle={vehicles[0]} />
+              <div className="grid md:grid-cols-2 gap-6">
+                {vehicles.map((vehicle) => (
+                  <VehicleHealthCard
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -234,10 +281,7 @@ export default function CustomerDashboard() {
       </main>
 
       {/* ADD VEHICLE DIALOG */}
-      <Dialog
-        open={showAddVehicleDialog}
-        onOpenChange={setShowAddVehicleDialog}
-      >
+      <Dialog open={showAddVehicleDialog} onOpenChange={setShowAddVehicleDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Vehicle</DialogTitle>

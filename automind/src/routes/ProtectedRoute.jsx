@@ -1,20 +1,12 @@
 import { Navigate } from "react-router-dom";
-import { auth } from "@/firebase";
+import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({ children }) {
-  const user = auth.currentUser;
-  const userRole = localStorage.getItem("role");
+export default function ProtectedRoute({ role, children }) {
+  const { user, userRole, loading } = useAuth();
 
-  // ❌ Not logged in
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" />;
+  if (role && userRole !== role) return <Navigate to="/role-selection" />;
 
-  // ❌ Logged in but role NOT selected
-  if (user && !userRole) {
-    return <Navigate to="/role-selection" replace />;
-  }
-
-  // ✅ Logged in AND role selected
   return children;
 }
