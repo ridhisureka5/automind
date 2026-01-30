@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+
+import {
+  fetchDiagnostics,
+  fetchAlerts
+} from "../services/diagnosticsApi";
 
 import Sidebar from "../components/dashboard/Sidebar";
 import StatsCard from "../components/dashboard/StatsCard";
@@ -12,38 +16,48 @@ import {
   Bell,
   Calendar,
   Activity,
-  Brain,
   Shield,
   Plus,
 } from "lucide-react";
 
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
+
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
+
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 
-import { fetchDiagnostics } from "../services/diagnosticsApi";
 
 /* ---------------- HELPER ---------------- */
 
 const randomHealth = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
+
+const speak = (text) => {
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.rate = 0.9;
+  window.speechSynthesis.speak(msg);
+};
+
+
 export default function CustomerDashboard() {
+
   const [vehicles, setVehicles] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   /* ADD VEHICLE STATE */
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
+
   const [newVehicle, setNewVehicle] = useState({
     make: "",
     model: "",
@@ -54,96 +68,239 @@ export default function CustomerDashboard() {
 
   const navigate = useNavigate();
 
+
+  // ---------------- LOAD DATA ----------------
+
   useEffect(() => {
     loadMLData();
   }, []);
 
-  /* ---------------- LOAD ML VEHICLE ---------------- */
 
   const loadMLData = async () => {
-    setIsLoading(true);
 
-    const ml = await fetchDiagnostics();
+    try {
 
-    const mlVehicle = {
-      id: Date.now(),
-      name: "Land Rover Defender",
-      make: "Land Rover",
-      model: "Defender",
-      year: 2024,
-      licensePlate: "AI-2047",
-      mileage: 42150,
+      setIsLoading(true);
 
-      healthScore: Math.round((1 - ml.final_risk) * 100),
+      const ml = await fetchDiagnostics();
+      const backendAlerts = await fetchAlerts();
 
-      components: [
-        { name: "Engine", health: Math.round((1 - ml.engine_prob) * 100) },
-        { name: "Bearings", health: Math.round((1 - ml.bearing_prob) * 100) },
-        { name: "Stress", health: Math.round((1 - ml.stress_index) * 100) },
-      ],
 
-      telemetryData: {
-        engineTemp: 98,
-        oilPressure: 64,
-        batteryVoltage: 12.6,
-        brakeWear: 32,
-      },
-    };
+      if (!ml || ml.final_risk === undefined) {
+        throw new Error("Invalid ML Data");
+      }
 
-    const mappedAlerts = ml.dtc_codes.map((code, i) => ({
-      id: i + 1,
-      title: code,
-      description: "AI detected a high probability of component failure.",
-      severity: ml.final_risk > 0.8 ? "critical" : "medium",
-      predictedFailureWindow: "Within 48 hours",
-      aiConfidence: Math.round(ml.final_risk * 100),
-    }));
 
-    setVehicles([mlVehicle]);
-    setAlerts(mappedAlerts);
-    setIsLoading(false);
+      /* ============ ML VEHICLE ============ */
+
+      const mlVehicle = {
+
+        id: ml.vehicle_id || Date.now(),
+
+        name: "Connected Vehicle",
+
+        make: "OEM",
+        model: "AI Series",
+
+        year: new Date().getFullYear(),
+
+        licensePlate: "AI-2047",
+
+        mileage: ml.mileage || 0,
+
+
+        healthScore: Math.round((1 - ml.final_risk) * 100),
+
+
+        components: [
+
+          {
+            name: "Engine",
+            health: Math.round((1 - ml.final_risk) * 100),
+          },
+
+          {
+            name: "Vibration",
+            health: Math.round(
+              (1 - (ml.vibration || 1) / 10) * 100
+            ),
+          },
+
+          {
+            name: "Stress",
+            health: Math.round(
+              (1 - (ml.stress_index || 10) / 100) * 100
+            ),
+          },
+        ],
+
+
+        telemetryData: {
+
+          engineTemp: ml.engine_temp,
+
+          oilPressure: ml.oil_pressure,
+
+          rpm: ml.rpm,
+
+          vibration: ml.vibration,
+        },
+      };
+
+
+      /* ============ MANUAL VEHICLES ============ */
+
+      const saved = localStorage.getItem("manual_vehicles");
+
+      const manualVehicles = saved
+        ? JSON.parse(saved)
+        : [];
+
+
+      setVehicles([mlVehicle, ...manualVehicles]);
+
+
+      /* ============ ALERTS ============ */
+
+      const validAlerts = Array.isArray(backendAlerts)
+        ? backendAlerts
+        : [];
+
+      setAlerts(validAlerts);
+
+
+      // Voice alerts
+      validAlerts.forEach((a) => {
+
+        if (a.status === "active") {
+
+          speak(`Alert! ${a.title}. ${a.description}`);
+        }
+      });
+
+
+      /* ============ SERVICES ============ */
+
+      const count = ml.service_demand || 1;
+
+      const generated = [];
+
+      for (let i = 1; i <= Math.min(count, 2); i++) {
+
+        generated.push({
+
+          id: i,
+
+          title: `Service #${i}`,
+
+          type: i === 1 ? "Preventive" : "Inspection",
+
+          status: "Scheduled",
+
+          date: new Date(
+            Date.now() + i * 86400000
+          ).toDateString(),
+        });
+      }
+
+      setServices(generated);
+
+      localStorage.setItem(
+        "customer_services",
+        JSON.stringify(generated)
+      );
+
+
+      setIsLoading(false);
+
+    } catch (err) {
+
+      console.error("Dashboard error:", err);
+
+      setVehicles([]);
+      setAlerts([]);
+      setServices([]);
+
+      setIsLoading(false);
+    }
   };
 
-  /* ---------------- ADD VEHICLE (REALISTIC HEALTH) ---------------- */
+
+  /* ---------------- ADD VEHICLE ---------------- */
 
   const handleAddVehicle = () => {
+
     if (!newVehicle.make || !newVehicle.model) return;
+
 
     const engineHealth = randomHealth(70, 95);
     const batteryHealth = randomHealth(75, 98);
     const brakeHealth = randomHealth(65, 92);
 
+
     const avgHealth = Math.round(
       (engineHealth + batteryHealth + brakeHealth) / 3
     );
 
+
     const vehicle = {
+
       id: Date.now(),
+
       name: `${newVehicle.make} ${newVehicle.model}`,
+
       make: newVehicle.make,
       model: newVehicle.model,
+
       year: newVehicle.year,
+
       licensePlate: newVehicle.licensePlate,
+
       vin: newVehicle.vin,
 
       mileage: randomHealth(5000, 120000),
+
       healthScore: avgHealth,
 
+
       components: [
+
         { name: "Engine", health: engineHealth },
+
         { name: "Battery", health: batteryHealth },
+
         { name: "Brakes", health: brakeHealth },
       ],
 
+
       telemetryData: {
+
         engineTemp: randomHealth(85, 110),
+
         oilPressure: randomHealth(50, 75),
-        batteryVoltage: (Math.random() * (12.8 - 12.2) + 12.2).toFixed(1),
-        brakeWear: randomHealth(10, 70),
+
+        rpm: randomHealth(2000, 4500),
+
+        vibration: randomHealth(1, 4),
       },
     };
 
+
+    // Save locally
+    const saved = localStorage.getItem("manual_vehicles");
+
+    const list = saved ? JSON.parse(saved) : [];
+
+    const updated = [...list, vehicle];
+
+    localStorage.setItem(
+      "manual_vehicles",
+      JSON.stringify(updated)
+    );
+
+
     setVehicles((prev) => [...prev, vehicle]);
+
     setShowAddVehicleDialog(false);
 
     setNewVehicle({
@@ -155,34 +312,46 @@ export default function CustomerDashboard() {
     });
   };
 
+
   /* ---------------- STATS ---------------- */
 
   const avgHealthScore =
     vehicles.length > 0
       ? Math.round(
-          vehicles.reduce((sum, v) => sum + v.healthScore, 0) /
-            vehicles.length
+          vehicles.reduce((s, v) => s + v.healthScore, 0) /
+          vehicles.length
         )
       : 0;
 
+
   const criticalAlerts = alerts.filter(
-    (a) => a.severity === "critical"
+    (a) => a.status === "active"
   ).length;
+
 
   return (
     <div className="min-h-screen bg-slate-50">
+
       <Sidebar />
 
+
       <main className="ml-64 p-8">
+
         {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
+
           <div>
-            <h1 className="text-3xl font-bold">Welcome back!</h1>
+            <h1 className="text-3xl font-bold">
+              Welcome back!
+            </h1>
+
             <p className="text-slate-500 mt-1">
               Here's your vehicle health overview
             </p>
           </div>
 
+
+          {/* ADD VEHICLE BUTTON */}
           <Button
             className="bg-yellow-400 hover:bg-yellow-500 text-slate-900"
             onClick={() => setShowAddVehicleDialog(true)}
@@ -190,79 +359,81 @@ export default function CustomerDashboard() {
             <Plus className="w-4 h-4 mr-2" />
             Add Vehicle
           </Button>
+
         </div>
+
 
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
           <StatsCard
             title="Average Health Score"
             value={`${avgHealthScore}%`}
             icon={Activity}
             color="green"
           />
+
           <StatsCard
             title="My Vehicles"
             value={vehicles.length}
             icon={Car}
             color="blue"
           />
+
           <StatsCard
             title="Active Alerts"
             value={alerts.length}
             icon={Bell}
             color={criticalAlerts ? "red" : "yellow"}
           />
+
           <StatsCard
             title="Scheduled Services"
-            value="2"
+            value={services.length}
             icon={Calendar}
             color="purple"
           />
+
         </div>
 
-        {/* AI AGENT */}
-        <motion.div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-yellow-400 rounded-xl flex items-center justify-center">
-              <Brain className="w-7 h-7 text-slate-900" />
-            </div>
-            <div>
-              <h3 className="text-white font-semibold text-lg">
-                AUTOMIND AI Agent
-              </h3>
-              <p className="text-slate-400 text-sm">
-                Continuously monitoring your vehicles
-              </p>
-            </div>
-          </div>
-        </motion.div>
 
+        {/* CONTENT */}
         <div className="grid lg:grid-cols-3 gap-8">
+
           {/* VEHICLES */}
           <div className="lg:col-span-2">
-            <h2 className="text-xl font-bold mb-4">My Vehicles</h2>
+
+            <h2 className="text-xl font-bold mb-4">
+              My Vehicles
+            </h2>
 
             {isLoading ? (
               <Skeleton className="h-80 rounded-2xl" />
             ) : (
-              <div className="grid md:grid-cols-2 gap-6">
-                {vehicles.map((vehicle) => (
-                  <VehicleHealthCard
-                    key={vehicle.id}
-                    vehicle={vehicle}
-                  />
-                ))}
-              </div>
+              vehicles.map((v) => (
+                <VehicleHealthCard
+                  key={v.id}
+                  vehicle={v}
+                />
+              ))
             )}
+
           </div>
+
 
           {/* ALERTS */}
           <div>
-            <h2 className="text-xl font-bold mb-4">Active Alerts</h2>
+
+            <h2 className="text-xl font-bold mb-4">
+              Active Alerts
+            </h2>
 
             {isLoading ? (
+
               <Skeleton className="h-40 rounded-xl" />
+
             ) : alerts.length > 0 ? (
+
               alerts.map((alert) => (
                 <AlertCard
                   key={alert.id}
@@ -270,59 +441,80 @@ export default function CustomerDashboard() {
                   onAction={() => navigate("/alerts")}
                 />
               ))
+
             ) : (
+
               <div className="bg-white p-6 rounded-xl text-center">
+
                 <Shield className="w-10 h-10 text-green-500 mx-auto mb-2" />
+
                 <p>No active alerts</p>
+
               </div>
             )}
+
           </div>
+
         </div>
-      </main>
 
-      {/* ADD VEHICLE DIALOG */}
-      <Dialog open={showAddVehicleDialog} onOpenChange={setShowAddVehicleDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Vehicle</DialogTitle>
-            <DialogDescription>
-              Enter your vehicle details to start monitoring
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+        {/* ADD VEHICLE DIALOG */}
+        <Dialog
+          open={showAddVehicleDialog}
+          onOpenChange={setShowAddVehicleDialog}
+        >
+
+          <DialogContent>
+
+            <DialogHeader>
+              <DialogTitle>Add New Vehicle</DialogTitle>
+            </DialogHeader>
+
+
+            <div className="space-y-3">
+
               <div>
                 <Label>Make</Label>
                 <Input
                   value={newVehicle.make}
                   onChange={(e) =>
-                    setNewVehicle({ ...newVehicle, make: e.target.value })
+                    setNewVehicle({
+                      ...newVehicle,
+                      make: e.target.value,
+                    })
                   }
                 />
               </div>
+
+
               <div>
                 <Label>Model</Label>
                 <Input
                   value={newVehicle.model}
                   onChange={(e) =>
-                    setNewVehicle({ ...newVehicle, model: e.target.value })
+                    setNewVehicle({
+                      ...newVehicle,
+                      model: e.target.value,
+                    })
                   }
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
+
               <div>
                 <Label>Year</Label>
                 <Input
-                  type="number"
                   value={newVehicle.year}
                   onChange={(e) =>
-                    setNewVehicle({ ...newVehicle, year: e.target.value })
+                    setNewVehicle({
+                      ...newVehicle,
+                      year: e.target.value,
+                    })
                   }
                 />
               </div>
+
+
               <div>
                 <Label>License Plate</Label>
                 <Input
@@ -335,35 +527,27 @@ export default function CustomerDashboard() {
                   }
                 />
               </div>
+
             </div>
 
-            <div>
-              <Label>VIN</Label>
-              <Input
-                value={newVehicle.vin}
-                onChange={(e) =>
-                  setNewVehicle({ ...newVehicle, vin: e.target.value })
-                }
-              />
-            </div>
-          </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowAddVehicleDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-yellow-400 hover:bg-yellow-500 text-slate-900"
-              onClick={handleAddVehicle}
-            >
-              Add Vehicle
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+
+              <Button
+                onClick={handleAddVehicle}
+                className="bg-yellow-400 text-slate-900"
+              >
+                Add
+              </Button>
+
+            </DialogFooter>
+
+          </DialogContent>
+
+        </Dialog>
+
+      </main>
+
     </div>
   );
 }
