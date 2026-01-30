@@ -1,21 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.diagnostics import router as diagnostics_router
 
-app = FastAPI(title="AUTOMIND Backend")
+from routes.diagnostics import router
 
-# ✅ CORS
+
+app = FastAPI()
+
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["http://localhost:5173"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True
 )
 
-# ✅ API routes
-app.include_router(diagnostics_router, prefix="/api")
+
+# Routes
+app.include_router(router, prefix="/api")
+
 
 @app.get("/")
 def root():
-    return {"status": "AUTOMIND backend running"}
+    return {"status": "Backend Running"}
